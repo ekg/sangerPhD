@@ -1,6 +1,7 @@
 all: paper
 
 paper:
+	pdflatex report
 	bibtex report
 	pdflatex report
 
