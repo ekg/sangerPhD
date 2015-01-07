@@ -203,7 +203,7 @@ Each variant represents a difference $d_i = { n, p, l, s }$, where $n$ is a node
 Let our our graph be a single node $R = n_r$ representing the reference.
 Now, instead of creating a new sequence such that $|n| = |R|$ for each variant, we can cut $R$ at $p$ and $p+l$, creating 2 nodes when $l = 0$ (as in insertions) or 3 nodes when $l > 0$.
 This cut operation yields a graph that has more nodes and edges, but represents exatly the same set of sequences.
-To construct a graph from a VCF file we extend this cut operation to paths, which we represent as lists of nodes $w = n_0 \ldots n_{|w|}$:
+To construct a graph from a VCF file we extend this cut operation to paths, which we represent as lists of nodes $w = n_0 \ldots n_{|w|}$.
 
 In algorithm \ref{alg:construct}, we iteratively apply this cut function to the reference path to generate a graph based on the variants. To incorporate our variation into the growing graph, we (1) create new nodes for novel sequences, (2) link nodes in the reference path to span deletions, and (3) create edges connecting these nodes into the existing graph. The result is a directed acyclic graph that is equivalent to a multiple sequence alignment (a PO-MSA).
 
@@ -288,12 +288,13 @@ Sequences can then be queried by breaking them into their components $k$-mers, l
 
 In our context, we have an additional problem. Whereas we can easily obtain subsequences from a linear reference, obtaining the sequence of a particular node from our graph requires us to load the entire system into memory. We could include a serialized index in our interchange format, but this would add complexity to a simple specification.
 
-To index the variant graph, first we implement a graph database using a disk-backed key value store. We use key namespacing to generate tables, and maintain interleaved tables for nodes and edges. Our values are serialized graph objects (nodes and edges). We can now add $k$-mer based keys to this graph, where the values are sets of nodes and positions in these nodes where the particular $k$-mers are found.
+To index the variant graph, first we implement a graph database using a disk-backed key value store. We use key namespacing to generate tables, and maintain interleaved tables for nodes and edges. Our values are serialized graph objects (nodes and edges).
 
-Indexing is straightforward provided the set of all paths of the graph, which would contain the set of $k$-mers that we'd like to index over. Problematically, the set of all paths of the graph is very large, on the order of $|G|^{|G|}$. But, as we are only interested in paths of a given length, we can bound the problem by working from $k-$paths, which we define as paths that extend no more than $k$ letters beyond a given (arbitrary) node.
+We can now add $k$-mer based keys to this graph, where the values are sets of nodes and positions in these nodes where the particular $k$-mers are found.
+Indexing is straightforward provided the set of all paths of the graph, which would contain the set of $k$-mers that we'd like to index over. Problematically, the set of all paths of the graph is very large, on the order of $|G|^{|G|}$. But, as we are only interested in paths of a given length, we can bound the problem by working from $k$-paths, which we define as paths that extend no more than $k$ letters beyond a given (arbitrary) node.
 
-We first define two recursive, depth-first searches to generate $k-$paths to the left (kpaths-) and right (kpaths+) of a given node. We then define a function which combines both of these to generate the $k-$paths for a given node (kpaths).
-Finally, we combine these in an algorithm \ref{alg:kpaths} that iterates over the nodes in our graph and $k$-mers in their $k-$paths.
+We first define two recursive, depth-first searches to generate $k$-paths to the left (kpaths-) and right (kpaths+) of a given node. We then define a function which combines both of these to generate the $k$-paths for a given node (kpaths).
+Finally, we combine these in an algorithm \ref{alg:kpaths} that iterates over the nodes in our graph and $k$-mers in their $k$-paths.
 
 
 \begin{algorithm}[h!]
@@ -320,13 +321,13 @@ Finally, we combine these in an algorithm \ref{alg:kpaths} that iterates over th
 
 \subsection{Alignment}
 
-Given a small graph, we can use partial order alignment (POA) \cite{lee2002POA} to generate an alignment between a novel sequence and our variation graph. To enable high-performance POA, we have followed the ``striped'' Smith-Waterman-Gotoh algorithm first described by \cite{farrar2007striped} as implemented in \cite{zhao2013ssw}, and adapted it to operate on partially-ordered sequence graphs to yield a parallel POA algorithm.
+Given a small graph, we can use partial order alignment (POA) \cite{lee2002POA} to generate an alignment between a novel sequence and our variation graph. To enable high-performance POA, we have followed the ``striped'' Smith-Waterman-Gotoh algorithm first described by \cite{farrar2007striped} as implemented in \cite{zhao2013ssw}, and adapted it to operate on partially-ordered sequence graphs to yield a parallel-POA algorithm (\url{https://github.com/ekg/gssw}).
 
 As genome-scale graphs will be very large, we cannot apply this algorithm to obtain optimal alignments. A standard alignment approach is to subset the reference system to regions that are likely to be similar to our target. Provided the $k$-mer index produced in the previous section, we can establish such regions by looking for the $k$-mers of our query sequence (given by the function $kmers\_of$) in the index, then building up a set of candidate neighborhoods in the graph and aligning to them.
 
 Each $k$-mer $s$ corresponds to a subgraph $g$ of $G$ whose paths contain $s$. We call the function that returns this subgraph $kmer\_subgraph$. Each graph may contain several disjoint subgraphs $g_1\ldots g_x$, such that $g_i \cup g_j = \emptyset \forall i \ne j \in [0,x]$. If we query the index for the graph neighborhoods which contain paths matching our $s$, we can expect not to be able to align $s$ until one of the subgraphs has paths that are at least as large as $s$.
 
-We thus construct a simple read mapping algorithm \ref{alg:map} by obtaining a $k$-mer subgraph $g$ for $s$, and expanding its neighborhood incrementally by adding neighbor nodes until the maximum subgraph size is at least $|s|$. Once this criteria is met, we have a good chance of being able to obtain an full alignment of our sequence to the graph. Local alignment can be obtained by joining the subgraphs of $g$ to a single root node, and then aligning against this structure in one pass using POA. The resulting alignment describes an optimal path through a set of nodes as well as novel differences between the sequence and the aligned nodes in the variation graph. Provided the ids used for the nodes are maintained through alignment, the alignment can be contextualized into the full graph despite being defined against a dynamically-constructed subgraph.
+We thus construct a simple read mapping algorithm \ref{alg:map} by obtaining a $k$-mer subgraph $g$ for $s$, and expanding its neighborhood incrementally by adding neighbor nodes until the maximum subgraph size is at least $|s|$. Once this criteria is met, we have a good chance of being able to obtain an full alignment of our sequence to the graph. A final alignment can be generated by joining the subgraphs of $g$ to a single root node, and then aligning against this structure in one pass using parallel-POA. The resulting alignment describes an optimal path through a set of nodes as well as novel differences between the sequence and the aligned nodes in the variation graph. Provided the ids used for the nodes are maintained through alignment, the alignment can be contextualized into the full graph despite being defined against a dynamically-constructed subgraph.
 
 
 \section{Results}
@@ -334,12 +335,6 @@ We thus construct a simple read mapping algorithm \ref{alg:map} by obtaining a $
 \subsection{Tests of the command-line API}
 
 The command-line API provided by $vg$ is validated through a series of tests which can be run by executing ``make test'' in the project repository. These include evaluations of graph construction, conversion into other formats, local alignment, mapping (alignment using an index), index generation and querying (find), id manipulation, graph concatenation, and the generation of statistics describing variation graphs. See \url{https://github.com/ekg/vg/tree/master/test/t} for the corresponding examples.
-
-\subsection{Construction of a variation graph from 2500 individuals}
-
-We apply $vg$ to the construction of a reference graph for the \href{http://www.1000genomes.org/announcements/phase3-variant-calls-chry-are-available-variant-calls-chrx-have-been-updated-2014-11-0}{1000 Genomes Phase 3 release}, which includes more than 80 million sequence variants across 2500 individuals. This process took approximately 24 hours on a 48-core AMD Opteron system (@ 2.8GHz). Construction times varyied due to other use of the system during this process, but ran from approximately 100 CPU hours for larger chromosomes (1,2,3) to 10 CPU hours for smaller ones (20,21,22). For exposition, we used ``vg stats'' to generate statistics about the size of the variation graph for each chromosome \ref{tab:1000G}. The total on-disk size of the graphs is 11 gigabytes, which is 2.6 times the size of the un-annotated variants in the VCF file (position, reference, alternate = 1.3G) plus the reference (3.0G).
-% ? what is the amount of added sequence in the graph relative to the reference?
-% borked... doh
 
 \begin{table}[h!]
 \begin{tabular}{ r || r | r | r | r | r | r }
@@ -377,14 +372,20 @@ Variation graphs generated from the 1000 Genomes final release, along with the n
 
 \end{table}
 
+\subsection{Construction of a variation graph from 2500 individuals}
+
+We apply $vg$ to the construction of a reference graph for the \href{http://www.1000genomes.org/announcements/phase3-variant-calls-chry-are-available-variant-calls-chrx-have-been-updated-2014-11-0}{1000 Genomes Phase 3 release}, which includes more than 80 million sequence variants across 2500 individuals. This process took approximately 24 hours on a 48-core AMD Opteron system (@ 2.8GHz). Construction times varyied due to other use of the system during this process, but ran from approximately 100 CPU hours for larger chromosomes (1,2,3) to 10 CPU hours for smaller ones (20,21,22). For exposition, we used ``vg stats'' to generate statistics about the size of the variation graph for each chromosome \ref{tab:1000G}. The total on-disk size of the graphs is 11 gigabytes, which is 2.6 times the size of the un-annotated variants in the VCF file (position, reference, alternate = 1.3G) plus the reference (3.0G).
+% ? what is the amount of added sequence in the graph relative to the reference?
+% borked... doh
+
+
 \section{Discussion}
 
-Here we have described a foundational system for the manipulation of a pan-genomic representation which we term a \emph{variation graph}. This system provides basic features that would be required if we were to engage in resequencing directly against this structure. We develop a binary interchange format for variation graphs and alignments against them. This format has a parallel representation in an on-disk index that allows fast querying of particular nodes and graph neighborhoods. We develop a method to index the $k$-mers of the variation graph and then align new sequences into the graph using this index to generate seeds.
+Here we have described and implemented a system for the manipulation of a pan-genomic representation which we term a \emph{variation graph}. This system provides basic features that would be required if we were to engage in resequencing directly against this structure. We develop a binary interchange format for variation graphs and alignments against them. This format has a parallel representation in an on-disk index that allows fast querying of particular nodes and graph neighborhoods. We develop a method to index the $k$-mers of the variation graph and then align new sequences into the graph using this index to generate seeds.
 
 Unfortunately, the available time for this work was limited, and we have not been able to explore several aspects of this problem, such as alignment against large graphs and genotyping or copy-number determination. The specific form which this process might follow is unclear. One can imagine that the process of ``variant calling'' might be replaced in this context by a graph pruning operation, in which candidate (sometimes novel) nodes in a graph describing all the sequencing result for a particular sample are removed where there is insufficient or inconsistent information. Other problems, such as how to communicate results derived entirely within this format to researchers who are accustomed to using a linear map of the genome, remain outside the immediate scope of this work.
 
 
-%\pagebreak
 
 \bibliography{references}{}
 
