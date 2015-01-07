@@ -49,7 +49,7 @@ Similarly, copy-number variations, which influence large regions of the human ge
 %Resources such as that produced by the 1000 Genomes Project now contain the vast majority (greater than $95\%$) of variation that we expect to find in a newly-sequenced human individual \cite{1000Gphase1}.
 %If we could generate a reference system including this variation, we could reduce the cost of genotyping it in new samples.
 
-\begin{figure}[h!]
+\begin{figure}[t]
 \centering
 \includegraphics[width=1.0\textwidth]{figures/RPLP0_90_ClustalW_aln}
 \caption{\label{fig:msa}
@@ -61,7 +61,7 @@ Similarly, copy-number variations, which influence large regions of the human ge
 
 A common model used to combine variation from many samples into one reference system is a multiple sequence alignment (\hyperref[fig:msa]{figure \ref{fig:msa}}). In this approach, sequences are encoded using an additional gap character, typically represented as ``-'', which indicates when one sequence in the multiple sequence alignment (MSA) has additional sequence where the one in which the gap is included does not. This mutually-gapped alignment has the desirable property that it fully-represents all of the sequences which were mutually aligned. This model has a dual representation as a partially-ordered graph in which nodes contain sequences in the alphabet of allowed characters (A, C, G, T for DNA, or the amino acids codes for proteins). In this partially-ordered graph, homologous aligned sequences are compressed into a single node or series of nodes (\hyperref[fig:poa]{figure \ref{fig:poa}}). Generalizations of pairwise alignment \cite{gotoh1982} allow the alignment of new sequences directly to this structure in $O(NM)$ time, where $N$ is the length of the query and $M$ the sum of lengths of unique sequences in the partially-ordered sequence graph \cite{lee2002POA}.
 
-\begin{figure}[h!]
+\begin{figure}[t]
 \centering
 \includegraphics[width=0.8\textwidth]{figures/poamsa}
 \caption{\label{fig:poa}
@@ -70,7 +70,7 @@ The relationship between a multiple sequence alignment (MSA) and a partially-ord
 \end{figure}
 
 
-\begin{figure}[h!]
+\begin{figure}[t]
 \centering
 \includegraphics[width=1.0\textwidth]{figures/stringgraph}
 \caption{\label{fig:stringgraph}
@@ -82,7 +82,7 @@ A genome and its string graph. Thick arrows illustrate identical, repeated seque
 
 While the partially-ordered representation of sequence variation can provide full information of many related sequences in a single model, the requirement of partial ordering limits its use to contexts where the complete synteny of a particular region can be established. A more general model for representing many sequences in the same context and allowing for cycles is the string graph, which was proposed by \cite{myers2005} and implemented efficiently at scale by \cite{simpson2010} in the SGA assembler. This represention captures and compresses all information about a genome or collection of genomes that can be derived from shotgun sequencing results (\ref{fig:stringgraph}). Sequences which are repeated in the input, such as transposons or copy number amplifications, are compressed into a single node in the string graph. The string graph does not require order, although it should be noted that it exhibits a manifold property in that small neighborhoods of the graph may maintain partial order. This property allows local alignment using methods described against partial orders, and further extensions of such methods allow alignment of cyclic graphs to cyclic graphs \cite{myers1989}.
 
-A similar approach to representing the sequences in a shotgun sequencing experiment in the same context is the de Bruijn graph. In this structure, each node represents a sequence of fixed size (a k-mer), and edges occur between nodes where the relationship $n_i[1, k] = n_j[0, k-1]$ is satisfied (note that $x[i, j]$ is a substring of $x$ from position $i$ to $j$). This structure has certain advantages conceptually over string graphs, in that it is often easier to operate on fixed-size kmers. However, as each novel k-mer in the graph will generate a series of new nodes, methods must prune the graph by filtering low-frequency sequences \cite{iqbal2012}. The lossy nature of practical implementations of this structure makes it less-attractive as a target model for representing many samples at the same time.
+A similar approach to representing the sequences in a shotgun sequencing experiment in the same context is the de Bruijn graph. In this structure, each node represents a sequence of fixed size (a $k-$mer), and edges occur between nodes where the relationship $n_i[1, k] = n_j[0, k-1]$ is satisfied (note that $x[i, j]$ is a substring of $x$ from position $i$ to $j$). This structure has certain advantages conceptually over string graphs, in that it is often easier to operate on fixed-size kmers. However, as each novel $k-$mer in the graph will generate a series of new nodes, methods must prune the graph by filtering low-frequency sequences \cite{iqbal2012}. The lossy nature of practical implementations of this structure makes it less-attractive as a target model for representing many samples at the same time.
 
 \subsection{Reference genome structures}
 
@@ -101,7 +101,7 @@ For DNA sequences, we might use $l = \{ A, T, G, C, N \}$, but in principle the 
 Edges represent linkages between sequences that have been observed in a reference set of samples or other sequences. We identify edges by the pairs of node ids that they conect: $e_{i \rightarrow j} = \{ i, j \}$.
 An edge $e_{i \rightarrow j}$ from $i$ to $j$ indicates that we have observed some sequence $n_i + n_j$.
 
-\begin{figure}[h!]
+\begin{figure}[t]
 \centering
 \includegraphics[width=0.6\textwidth]{figures/variationgraph}
 \caption{\label{fig:variationgraph}
@@ -117,9 +117,9 @@ We complied the schema into a C++ library which can be used to manipulate the ba
 The resulting library defines a set of classes representing our graph whose in-memory and on-wire (or on-disk) representation is nearly identical.
 This allows us to efficiently store and retrieve fragments of the graph in a database, without incurring significantly more overhead than if the graph fragments were simple strings.
 
-We extend the basic classes produced by the protocol buffer compiler by wrapping them in a convenience class (VG) which defines a number of abstract operations on the graph. This graph object forms the core of a local alignment algorithm, a disk-based indexing system, and a mapper that employs both these modules to align reads against a large graph using k-mer matching and local partial-order alignment..
+We extend the basic classes produced by the protocol buffer compiler by wrapping them in a convenience class (VG) which defines a number of abstract operations on the graph. This graph object forms the core of a local alignment algorithm, a disk-based indexing system, and a mapper that employs both these modules to align reads against a large graph using $k-$mer matching and local partial-order alignment..
 
-These functions are exposed by the command-line utility \emph{vg}, which provides the following interface:
+These functions are exposed by the command-line utility \emph{vg} (\url{https://github.com/ekg/vg}), which provides the following interface:
 
 \begin{description}
   \item[ construct    ] graph construction
@@ -135,16 +135,13 @@ These functions are exposed by the command-line utility \emph{vg}, which provide
   \item[ concat       ] concatenate graphs tail-to-head
 \end{description}
 
-\subsection{Graph construction}
-
-As most population-scale data is available in VCF format, we have developed a construction method that takes a VCF file and FASTA reference genome as input and produces a variant graph (VG) data stream as output.
-The algorithm can be executed in parallel for chunks of regions of the genome. For efficiency on multi-processor systems, we implemented a parallel algorithm based on OpenMP compiler directives.
-
-Each variant represents a difference $d_i = { n, p, l, s }$, where $n$ is a node, $p$ is a position, $l$ is a length, and $s$ is a new string which replaces $l$ positions in $n$ to form a new node $n'$.
-Let our our graph be a single node $R = n_r$ representing the reference.
-Now, instead of creating a new sequence such that $|n| = |R|$ for each variant, we can cut $R$ at $p$ and $p+l$, creating 2 nodes when $l = 0$ (as in insertions) or 3 nodes when $l > 0$.
-This cut operation yields a graph that has more nodes and edges, but represents exatly the same set of sequences.
-To construct a graph from a VCF file we extend this cut operation to paths, which we represent as lists of nodes $w = n_0 \ldots n_{|w|}$:
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.5\textwidth]{figures/complexjunction}
+\caption{\label{fig:complexjunction}
+  An illustration of a complex portion of a variation graph. This represents a C/G SNP, followed immediately by a reference-relative insertion of a G, then an A/G SNP.
+}
+\end{figure}
 
 \begin{function}[h!]
   \label{func:cut}
@@ -171,12 +168,10 @@ To construct a graph from a VCF file we extend this cut operation to paths, whic
   \caption{Cut($w$, $d$) cuts path $w$ as defined by difference $d$}
 \end{function}
 
-In algorithm \ref{alg:construct}, we iteratively apply this cut function to the reference path to generate a graph based on the variants. To incorporate our variation into the growing graph, we (1) create new nodes for novel sequences, (2) link nodes in the reference path to span deletions, and (3) create edges connecting these nodes into the existing graph. The result is a directed acyclic graph that is equivalent to a multiple sequence alignment (a PO-MSA).
-
 \begin{algorithm}[h!]
   $R \gets $ reference sequence \\
   $G \gets ( R, \emptyset )$ \\
-  \For{$\forall d \in$ input}{
+  \For{$d \in$ input}{
     $R \gets Cut(R, d)$ \\
     $n_l \gets $ node to the left of the cut \\
     $n_m \gets $ node in the middle of the cut (or $null$ if none exists) \\
@@ -197,15 +192,89 @@ In algorithm \ref{alg:construct}, we iteratively apply this cut function to the 
 Graph construction from a list of variants and a reference}
 \end{algorithm}
 
+
+
+\subsection{Graph construction}
+
+As most population-scale data is available in VCF format, we have developed a construction method that takes a VCF file and FASTA reference genome as input and produces a variant graph (VG) data stream as output.
+The algorithm can be executed in parallel for chunks of regions of the genome. For efficiency on multi-processor systems, we implemented a parallel algorithm based on OpenMP compiler directives.
+
+Each variant represents a difference $d_i = { n, p, l, s }$, where $n$ is a node, $p$ is a position, $l$ is a length, and $s$ is a new string which replaces $l$ positions in $n$ to form a new node $n'$.
+Let our our graph be a single node $R = n_r$ representing the reference.
+Now, instead of creating a new sequence such that $|n| = |R|$ for each variant, we can cut $R$ at $p$ and $p+l$, creating 2 nodes when $l = 0$ (as in insertions) or 3 nodes when $l > 0$.
+This cut operation yields a graph that has more nodes and edges, but represents exatly the same set of sequences.
+To construct a graph from a VCF file we extend this cut operation to paths, which we represent as lists of nodes $w = n_0 \ldots n_{|w|}$:
+
+In algorithm \ref{alg:construct}, we iteratively apply this cut function to the reference path to generate a graph based on the variants. To incorporate our variation into the growing graph, we (1) create new nodes for novel sequences, (2) link nodes in the reference path to span deletions, and (3) create edges connecting these nodes into the existing graph. The result is a directed acyclic graph that is equivalent to a multiple sequence alignment (a PO-MSA).
+
 The algorithm is relatively straightforward, but we must take care to connect non-reference nodes together when they occur at successive reference positions. This can lead to relatively complex structures, as shown in figure \ref{fig:complexjunction}
 
-\begin{figure}[h!]
-\centering
-\includegraphics[width=0.5\textwidth]{figures/complexjunction}
-\caption{\label{fig:complexjunction}
-  An illustration of a complex portion of a variation graph. This represents a C/G SNP, followed immediately by a reference-relative insertion of a G, then an A/G SNP.
+
+\begin{function}[h!]
+  \label{func:kpaths+}
+  $children \gets \forall n' : \exists e_{n' \rightarrow n} \in G$ \\
+  $w \gets \emptyset$ \\
+  \eIf{$children = \emptyset$}{
+    add $p$ to $w$
+  }{
+    \For{$c$ in $children$}{
+      \eIf{$|seq(c)| < k$}{
+        add kpaths+($c$, $p$, $w$, $k-|seq(c)|$, $G$) to $w$
+      }{
+        $p' \gets p + c$ \\
+        $w \gets w + p'$
+      }
+    }
+  }
+  \Return $w$
+  \caption{kpaths+($n$, $p$, $k$, $G$) generates paths prefixed by $p$ that extend \emph{right} no more than $k$ from node $n$ }
+\end{function}
+
+\begin{function}[h!]
+  \label{func:kpaths-}
+  $parents \gets \forall n' : \exists e_{n \rightarrow n'} \in G$ \\
+  $w \gets \emptyset$ \\
+  \eIf{$parents = \emptyset$}{
+    add $s$ to $w$
+  }{
+    \For{$p$ in $parents$}{
+      \eIf{$|seq(p)| < k$}{
+        add kpaths-($p$, $p$, $w$, $k-|seq(p)|$, $G$) to $w$
+      }{
+        $s' \gets p + s$ \\
+        $w \gets w + s'$
+      }
+    }
+  }
+  \Return $w$
+  \caption{kpaths-($n$, $s$, $k$, $G$) generates paths suffixed by $s$ that extend \emph{left} no more than $k$ from node $n$ }
+\end{function}
+
+\begin{function}[h!]
+  \label{func:kpaths}
+  $emptyp \gets []$ \\
+  $prev \gets $kpaths-($n$, $emptyp$, $k$, $G$) \\
+  $next \gets $kpaths+($n$, $emptyp$, $k$, $G$) \\
+  \Return $prev \cap next$ 
+  \caption{kpaths($n$, $k$, $G$) generates paths that extend from $n$ no more than $k$ letters }
+\end{function}
+
+\begin{algorithm}[h!]
+  $I$ is our index \\
+  $k$ is our target $k-$mer size \\
+  \For{$n \in G$}{
+    \For{$w \in $ kpaths($n$, $k$, $G$)}{
+      \For{$k \in $ $k-$mers of $w$}{
+        $I[k] \gets $ ids of nodes in $w$
+      }
+    }
+  }
+  \caption{
+\label{alg:kpaths}
+Generate $k-$paths of a graph
 }
-\end{figure}
+\end{algorithm}
+
 
 \subsection{Indexing}
 
@@ -213,64 +282,23 @@ A reference sequence is much-less useful if we can't quickly find subsequences m
 
 An ideal indexing strategy would allow the query of sequences of any length directly from the index, a property which is typified by suffix arrays \cite{puglisi2007taxonomy}. Compressed suffix arrays exploit redundancies in the indexed corpus to reduce their memory usage. In the context of linear sequences, the relationship between the compressible Burrows-Wheeler transform and the suffix array has been used to generate very memory-efficient alignment algorithms \cite{li2013aligning}. Extensions of this model extend the underlying sequence to be a directed acyclic graph, but existing implementations have only provided this at a high (~100X) cost in runtime \cite{siren2011indexing, huang2013short} relative to indexes based on linear sequences.
 
-A simple, if less memory-efficient approach is to index k-mers of a particular size corresponding to positions (or nodes) within the reference (or graph), as is done in popular query tools such as blat \cite{kent2002blat} and short-read aligners like Mosaik \cite{lee2014mosaik} and Novoalign (\url{http://novocraft.com}).
-Sequences can then be queried by breaking them into their components k-mers, looking these up, and clustering the results using the positional information provided in the index.
+A simple, if less memory-efficient approach is to index $k-$mers of a particular size corresponding to positions (or nodes) within the reference (or graph), as is done in popular query tools such as blat \cite{kent2002blat} and short-read aligners like Mosaik \cite{lee2014mosaik} and Novoalign (\url{http://novocraft.com}).
+Sequences can then be queried by breaking them into their components $k-$mers, looking these up, and clustering the results using the positional information provided in the index.
 ``Local'' alignment can then be used to refine the description of the mapping between the query and the reference.
 
 In our context, we have an additional problem. Whereas we can easily obtain subsequences from a linear reference, obtaining the sequence of a particular node from our graph requires us to load the entire system into memory. We could include a serialized index in our interchange format, but this would add complexity to a simple specification.
 
-To index the variant graph, first we implement a graph database using a disk-backed key value store. We use key namespacing to generate tables, and maintain interleaved tables for nodes and edges. Our values are serialized graph objects (nodes and edges). We can now add k-mer based keys to this graph, where the values are sets of nodes and positions in these nodes where the particular k-mers are found.
+To index the variant graph, first we implement a graph database using a disk-backed key value store. We use key namespacing to generate tables, and maintain interleaved tables for nodes and edges. Our values are serialized graph objects (nodes and edges). We can now add $k-$mer based keys to this graph, where the values are sets of nodes and positions in these nodes where the particular $k-$mers are found.
 
-Indexing is straightforward provided the set of all paths of the graph, which would contain the set of k-mers that we'd like to index over. Problematically, the set of all paths of the graph is very large, on the order of $|G|^{|G|}$. But, as we are only interested in paths of a given length, we can bound the problem by working from $k-$paths, which we define as paths that extend no more than $k$ letters beyond a given (arbitrary) node.
+Indexing is straightforward provided the set of all paths of the graph, which would contain the set of $k-$mers that we'd like to index over. Problematically, the set of all paths of the graph is very large, on the order of $|G|^{|G|}$. But, as we are only interested in paths of a given length, we can bound the problem by working from $k-$paths, which we define as paths that extend no more than $k$ letters beyond a given (arbitrary) node.
 
-We first define two recursive, depth-first searches to generate $k-$paths to the left (-) and right (+) of a given node:
+We first define two recursive, depth-first searches to generate $k-$paths to the left (kpaths-) and right (kpaths+) of a given node. We then define a function which combines both of these to generate the $k-$paths for a given node (kpaths).
+Finally, we combine these in an algorithm \ref{alg:kpaths} that iterates over the nodes in our graph and $k-$mers in their $k-$paths.
 
-\begin{function}[h!]
-  \label{func:kpaths+}
-  $children \gets \forall n' : \exists e_{n' \rightarrow n} \in G$ \\
-  \eIf{$children = \emptyset$}{
-    add $p$ to $w$
-  }{
-    \For{$c$ in $children$}{
-      \eIf{$|seq(c)| < k$}{
-        kpaths+($c$, $p$, $w$, $k-|seq(c)|$, $G$)
-      }{
-        $p' \gets p + c$ \\
-        $w \gets w + p'$
-      }
-    }
-  }
-  \caption{kpaths+($n$, $p$, $w$, $k$, $G$) generates paths $w$ prefixed by $p$ that extend \emph{right} no more than $k$ from node $n$ }
-\end{function}
-
-\begin{function}[h!]
-  \label{func:kpaths-}
-  $parents \gets \forall n' : \exists e_{n \rightarrow n'} \in G$ \\
-  \eIf{$parents = \emptyset$}{
-    add $s$ to $w$
-  }{
-    \For{$p$ in $parents$}{
-      \eIf{$|seq(p)| < k$}{
-        kpaths-($p$, $p$, $w$, $k-|seq(p)|$, $G$)
-      }{
-        $s' \gets p + s$ \\
-        $w \gets w + s'$
-      }
-    }
-  }
-  \caption{kpaths-($n$, $s$, $w$, $k$, $G$) generates paths $w$ suffixed by $s$ that extend \emph{left} no more than $k$ from node $n$ }
-\end{function}
-
-In algorithm \ref{alg:kpaths} we iterate across the nodes in the graph to generate all $k-$paths, and store these in the k-mer table of our database.
-
-\begin{algorithm}[h!]
-  
-  \caption{
-\label{alg:kpaths}
-Graph construction from a list of variants and a reference}
-\end{algorithm}
 
 \subsection{Alignment}
+
+We have implemented 
 
 % write algorithm
 
@@ -280,7 +308,7 @@ Graph construction from a list of variants and a reference}
 
 \section{Discussion}
 
-\pagebreak
+%\pagebreak
 
 \bibliography{references}{}
 
