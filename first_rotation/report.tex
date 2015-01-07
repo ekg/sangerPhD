@@ -1,9 +1,10 @@
 \documentclass{article}
 \usepackage{hyperref}
 \usepackage{graphicx}
+%\usepackage{algorithmicx}
+\usepackage{algorithm2e}
 
 \begin{document}
-
 
 \title{Resequencing against a variation graph}
 
@@ -69,7 +70,7 @@ The relationship between a multiple sequence alignment (MSA) and a partially-ord
 \end{figure}
 
 
-\begin{figure}
+\begin{figure}[h!]
 \centering
 \includegraphics[width=1.0\textwidth]{figures/stringgraph}
 \caption{\label{fig:stringgraph}
@@ -81,7 +82,7 @@ A genome and its string graph. Thick arrows illustrate identical, repeated seque
 
 While the partially-ordered representation of sequence variation can provide full information of many related sequences in a single model, the requirement of partial ordering limits its use to contexts where the complete synteny of a particular region can be established. A more general model for representing many sequences in the same context and allowing for cycles is the string graph, which was proposed by \cite{myers2005} and implemented efficiently at scale by \cite{simpson2010} in the SGA assembler. This represention captures and compresses all information about a genome or collection of genomes that can be derived from shotgun sequencing results (\ref{fig:stringgraph}). Sequences which are repeated in the input, such as transposons or copy number amplifications, are compressed into a single node in the string graph. The string graph does not require order, although it should be noted that it exhibits a manifold property in that small neighborhoods of the graph may maintain partial order. This property allows local alignment using methods described against partial orders, and further extensions of such methods allow alignment of cyclic graphs to cyclic graphs \cite{myers1989}.
 
-A similar approach to representing the sequences in a shotgun sequencing experiment in the same context is the de Bruijn graph. In this structure, each node represents a sequence of fixed size (a k-mer), and edges occur between nodes where the relationship $n_i[1,\ldots,k] = n_j[0,\ldots,k-1]$ is satisfied. This structure has certain advantages conceptually over string graphs, in that it is often easier to operate on fixed-size kmers. However, as each novel k-mer in the graph will generate a series of new nodes, methods must prune the graph by filtering low-frequency sequences \cite{iqbal2012}. The lossy nature of practical implementations of this structure makes it less-attractive as a target model for representing many samples at the same time.
+A similar approach to representing the sequences in a shotgun sequencing experiment in the same context is the de Bruijn graph. In this structure, each node represents a sequence of fixed size (a k-mer), and edges occur between nodes where the relationship $n_i[1, k] = n_j[0, k-1]$ is satisfied (note that $x[i, j]$ is a substring of $x$ from position $i$ to $j$). This structure has certain advantages conceptually over string graphs, in that it is often easier to operate on fixed-size kmers. However, as each novel k-mer in the graph will generate a series of new nodes, methods must prune the graph by filtering low-frequency sequences \cite{iqbal2012}. The lossy nature of practical implementations of this structure makes it less-attractive as a target model for representing many samples at the same time.
 
 \subsection{Reference genome structures}
 
@@ -95,11 +96,12 @@ In this effort, we sought to develop a practical implementation of a reference s
 
 \subsection{Model}
 
-Formally, our model is a graph $G$ comprised of a set of nodes $N = n_1, \ldots ,n_M$ and a set of edges $E = e_1, \ldots, e_L$ such that $|N| = M$ and $|E| = L$. Each node $n_i$ represents a sequence $s_i$ which is built from an arbitrary alphabet $l$.
+Formally, our model is a graph $G = ( N, E )$ comprised of a set of nodes $N = n_1, \ldots ,n_M$ and a set of directed edges $E = e_1 \ldots e_L$ such that $|N| = M$ and $|E| = L$. Each node $n_i$ represents a sequence $seq(n_i)$ which is built from an arbitrary alphabet $l$.
 For DNA sequences, we might use $l = \{ A, T, G, C, N \}$, but in principle the model can be based in any alphabet.
 Edges represent linkages between sequences that have been observed in a reference set of samples or other sequences. We identify edges by the pairs of node ids that they conect: $e_{i \rightarrow j} = \{ i, j \}$.
+An edge $e_{i \rightarrow j}$ from $i$ to $j$ indicates that we have observed some sequence $n_i + n_j$.
 
-\begin{figure}
+\begin{figure}[h!]
 \centering
 \includegraphics[width=0.6\textwidth]{figures/variationgraph}
 \caption{\label{fig:variationgraph}
@@ -136,9 +138,74 @@ These functions are exposed by the command-line utility \emph{vg}, which provide
 \subsection{Graph construction}
 
 As most population-scale data is available in VCF format, we have developed a construction method that takes a VCF file and FASTA reference genome as input and produces a variant graph (VG) data stream as output.
-To improve efficiency on multi-processor systems, we implemented a parallel algorithm based on OpenMP compiler directives.
+The algorithm can be executed in parallel for chunks of regions of the genome. For efficiency on multi-processor systems, we implemented a parallel algorithm based on OpenMP compiler directives.
 
-% write algorithm
+Each variant represents a difference $d_i = { n, p, l, s }$, where $n$ is a node, $p$ is a position, $l$ is a length, and $s$ is a new string which replaces $l$ positions in $n$ to form a new node $n'$.
+Let our our graph be a single node $R = n_r$ representing the reference.
+Now, instead of creating a new sequence such that $|n| = |R|$ for each variant, we can cut $R$ at $p$ and $p+l$, creating 2 nodes when $l = 0$ (as in insertions) or 3 nodes when $l > 0$.
+This cut operation yields a graph that has more nodes and edges, but represents exatly the same set of sequences.
+To construct a graph from a VCF file we extend this cut operation to paths, which we represent as lists of nodes $w = n_0 \ldots n_{|w|}$:
+
+\begin{function}[h!]
+  \label{func:cut}
+  $i \gets 0$ \\
+  $j \gets 0$ \\
+  \While{$i < position(d)$}{
+      $i \gets i + |seq(n_j)|$ \\
+      $j \gets j + 1$ \\
+  }
+  $l \gets position(d) - (i - |seq(n_j)|)$ \\
+  $h \gets i$ \\
+  $k \gets j$ \\
+  \While{$h < position(d) + l$}{
+      $h \gets i + |seq(n_k)|$ \\
+      $k \gets k + 1$ \\
+  }
+  $r \gets position(d) - (h - |seq(n_k)|)$ \\
+  $left \gets n_j[0, l]$ \\
+  \If{$length(d) > 0$}{
+    $middle \gets n_j[l, |n_j|]\ldots n_k[0, r]$
+  }
+  $right \gets n_k[r+length(d), |n_k|]$ \\
+  \Return $n_0\ldots n_j-1, left, middle, right, n_k+1\ldots n_{|w|}$ \\
+  \caption{Cut($w$, $d$) cuts path $w$ as defined by difference $d$}
+\end{function}
+
+In algorithm \ref{alg:construct}, we iteratively apply this cut function to the reference path to generate a graph based on the variants. To incorporate our variation into the growing graph, we (1) create new nodes for novel sequences, (2) link nodes in the reference path to span deletions, and (3) create edges connecting these nodes into the existing graph. The result is a directed acyclic graph that is equivalent to a multiple sequence alignment (a PO-MSA).
+
+\begin{algorithm}[h!]
+  $R \gets $ reference sequence \\
+  $G \gets ( R, \emptyset )$ \\
+  \For{$\forall d \in$ input}{
+    $R \gets Cut(R, d)$ \\
+    $n_l \gets $ node to the left of the cut \\
+    $n_m \gets $ node in the middle of the cut (or $null$ if none exists) \\
+    $n_r \gets $ node to the right of the cut \\
+    \If{$length(d) > 0$}{
+      add $e_{n_r \rightarrow n_l}$ to $G$
+    }
+    \If{$|seq(d)| > 0$}{
+      add $n_a \gets seq(d)$ to $G$ \\
+      add path $right,n,left$ to $G$ \\
+      \For{$\forall n \notin R : \exists e_{n \rightarrow n_m} \lor \exists e_{n \rightarrow n_r}$}{
+        add $e_{n \rightarrow n_a}$ to $G$
+      }
+    }
+  }
+  \caption{
+\label{alg:construct}
+Graph construction from a list of variants and a reference}
+\end{algorithm}
+
+The algorithm is relatively straightforward, but we must take care to connect non-reference nodes together when they occur at successive reference positions. This can lead to relatively complex structures, as shown in figure \ref{fig:complexjunction}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/complexjunction}
+\caption{\label{fig:complexjunction}
+hello
+}
+\end{figure}
 
 \subsection{Indexing}
 
