@@ -31,7 +31,7 @@ Or, they may simply be difficult to completely assemble reliably using existing 
 
 To enable genomics without requiring expensive full \emph{de novo} assemblies of each new sample, we localize short, cheap reads against a single high-quality reference genome.
 While expedient, this approach biases our results towards a reference that may poorly-represent alleles present in the sample we are attempting to characterize.
-We would like to align to a genome that is as similar to our sample as possible, ideally a ``personalize'' reference genome \cite{Yuan_2012}.
+We would like to align to a genome that is as similar to our sample as possible, ideally a ``personalized'' reference genome \cite{Yuan_2012}.
 
 One way to achieve this would be to align against a reference system that contains known common variation from related individuals of the same species.
 Such a system could take a number of forms, and to motivate our particular solution we first review different approaches to representing many sequences in the same context.
@@ -59,7 +59,7 @@ Similarly, copy-number variations, which influence large regions of the human ge
 
 \subsection{Partially-ordered sequence graphs}
 
-A common model used to combine variation from many samples into one reference system is a multiple sequence alignment (\hyperref[fig:msa]{figure \ref{fig:msa}}). In this approach, sequences are encoded using an additional gap character, typically represented as ``-'', which indicates when one sequence in the multiple sequence alignment (MSA) has additional sequence where the one in which the gap is included does not. This mutually-gapped alignment has the desirable property that it fully-represents all of the sequences which were mutually aligned. This model has a dual representation as a partially-ordered graph in which nodes contain sequences in the alphabet of allowed characters (A, C, G, T for DNA, or the amino acids codes for proteins). In this partially-ordered graph, homologous aligned sequences are compressed into a single node or series of nodes (\hyperref[fig:poa]{figure \ref{fig:poa}}). Generalizations of pairwise alignment \cite{gotoh1982} allow the alignment of new sequences directly to this structure in $O(NM)$ time, where $N$ is the length of the query and $M$ the sum of lengths of unique sequences in the partially-ordered sequence graph \cite{lee2002POA}.
+A common model used to combine variation from many samples into one reference system is a multiple sequence alignment (MSA, figure \ref{fig:msa}). In this approach, sequences are encoded using an additional gap character, typically represented as ``-'', which indicates when one sequence in the MSA has additional sequence where the one in which the gap is included does not. This mutually-gapped alignment has the desirable property that it fully-represents all of the sequences which were mutually aligned. This model has a dual representation as a partially-ordered graph in which nodes contain sequences in the alphabet of allowed characters (A, C, G, T for DNA, or the amino acids codes for proteins). In this partially-ordered graph, homologous aligned sequences are compressed into a single node or series of nodes (figure \ref{fig:poa}). Generalizations of pairwise alignment \cite{gotoh1982} allow the alignment of new sequences directly to this structure in $O(NM)$ time, where $N$ is the length of the query and $M$ the sum of lengths of unique sequences in the partially-ordered sequence graph \cite{lee2002POA}.
 
 \begin{figure}[t]
 \centering
@@ -80,23 +80,25 @@ A genome and its string graph. Thick arrows illustrate identical, repeated seque
 
 \subsection{Assemblies using string graphs and de Bruijn graphs}
 
-While the partially-ordered representation of sequence variation can provide full information of many related sequences in a single model, the requirement of partial ordering limits its use to contexts where the complete synteny of a particular region can be established. A more general model for representing many sequences in the same context and allowing for cycles is the string graph, which was proposed by \cite{myers2005} and implemented efficiently at scale by \cite{simpson2010} in the SGA assembler. This represention captures and compresses all information about a genome or collection of genomes that can be derived from shotgun sequencing results (\ref{fig:stringgraph}). Sequences which are repeated in the input, such as transposons or copy number amplifications, are compressed into a single node in the string graph. The string graph does not require order, although it should be noted that it exhibits a manifold property in that small neighborhoods of the graph may maintain partial order. This property allows local alignment using methods described against partial orders, and further extensions of such methods allow alignment of cyclic graphs to cyclic graphs \cite{myers1989}.
+While the partially-ordered representation of sequence variation can provide full information of many related sequences in a single model, the requirement of partial ordering limits its use to contexts where the complete synteny of a particular region can be established. A more general model for representing many sequences in the same context and allowing for cycles is the string graph, which was proposed by \cite{myers2005} and implemented efficiently at scale by \cite{simpson2010} in the SGA assembler. This represention captures and compresses all information about a genome or collection of genomes that can be derived from shotgun sequencing results (figure \ref{fig:stringgraph}). Sequences which are repeated in the input, such as transposons or copy number amplifications, are compressed into a single node in the string graph. The string graph does not require order, but this does not mean we could not use it as the basis for resequencing, as generalizations of string-to-graph alignment (e.g. POA) allow alignment of cyclic graphs to cyclic graphs \cite{myers1989}.
 
-A similar approach to representing the sequences in a shotgun sequencing experiment in the same context is the de Bruijn graph. In this structure, each node represents a sequence of fixed size (a $k-$mer), and edges occur between nodes where the relationship $n_i[1, k] = n_j[0, k-1]$ is satisfied (note that $x[i, j]$ is a substring of $x$ from position $i$ to $j$). This structure has certain advantages conceptually over string graphs, in that it is often easier to operate on fixed-size kmers. However, as each novel $k-$mer in the graph will generate a series of new nodes, methods must prune the graph by filtering low-frequency sequences \cite{iqbal2012}. The lossy nature of practical implementations of this structure makes it less-attractive as a target model for representing many samples at the same time.
+A similar approach to representing the sequences in a shotgun sequencing experiment in the same context is the de Bruijn graph. In this structure, each node represents a sequence of fixed size (a $k$-mer), and edges occur between nodes where the relationship $n_i[1, k] = n_j[0, k-1]$ is satisfied (note that $x[i, j]$ is a substring of $x$ from position $i$ to $j$). This structure has certain advantages conceptually over string graphs, in that it is often easier to operate on fixed-size kmers. However, as each novel $k$-mer in the graph will generate a series of new nodes, de Bruijn graph methods maintain reasonable memory usage by pruning low-abundance $k$-mers from the graph \cite{iqbal2012}. The lossy nature of practical implementations of this structure makes it less-attractive as a target model for representing many samples at the same time.
 
 \subsection{Reference genome structures}
 
-Recent work \cite{paten2014} describes a comprehensive system that is related in scope to both string graphs and partially-ordered sequence graphs. In this \emph{reference genome structure}, sequences are attached to nodes and linkages between sequences occur where two sequences were observed in synteny in some haplotype in a reference set. This structure extends on other forms of sequence graphs by adding a mapping operation to the graph. In this \emph{left-right mapping} operation, the mapping of a new sequence (or more generally, another graph) into the existing reference system is driven by the discovery of unique contexts of a given length surrounding each node or neighborhood in the graph.
+Recent work \cite{paten2014mapping} describes a comprehensive system that is related in scope to both string graphs and partially-ordered sequence graphs. In this \emph{reference genome structure}, sequences are attached to nodes and linkages between sequences occur where two sequences were observed in synteny in some haplotype in a reference set. This structure extends on other forms of sequence graphs by adding a mapping operation to the graph. In this \emph{left-right mapping} operation, the mapping of a new sequence (or more generally, another graph) into the existing reference system is driven by the discovery of unique contexts of a given length surrounding each node or neighborhood in the graph.
 
 \subsection{Variation graphs}
 
-In this effort, we sought to develop a practical implementation of a reference system that can (1) be used to represent and describe variation in many related samples (such as from the same species), (2) allow mapping of new sequences into this space, and (3) enable the genotyping (effectively copy-number assignment) of segments in the graph in a given individual or set of individuals whose sequencing results have been mapped into the system. These requirements may be met by a number of underlying representations, but for the sake of expediency, we have chosen to implement first a generic model which places no restrictions on the structure of the graph. For instance, we do not require that repeated sequences are represented only once (as in string graphs), or that mappings require particularly-sized globally-unique contexts (as in reference genome structures). Nor is there a particular limit placed on the size of nodes. In a global context we allow for cycles, but when mapping we require the graph is partially ordered. This \emph{variation graph} is simply a general, assumption-free model that allows us to begin building a practical system to enable resequencing against both genome assemblies (e.g. string graphs) and partial orders such as are implied by a reference genome and a list of SNPs and indels.
+In this effort, we sought to develop a practical implementation of a reference system that can (1) be used to represent and describe variation in many related samples (such as from the same species), (2) allow mapping of new sequences into this space, and (3) enable the genotyping (effectively copy-number assignment) of segments in the graph in a given individual or set of individuals whose sequencing results have been mapped into the system.
+
+These requirements may be met by a number of underlying representations, but for the sake of expediency, we have chosen to implement first a generic model which places no restrictions on the structure of the graph. For instance, we do not require that repeated sequences are represented only once (as in string graphs), or that mappings require particularly-sized globally-unique contexts (as in reference genome structures). Nor is there a particular limit placed on the size of nodes. In a global context we allow for cycles, but when mapping we require the graph is partially ordered. This \emph{variation graph} is simply a general, assumption-free model that allows us to begin building a practical system to enable resequencing against both genome assemblies (e.g. string graphs) and partial orders such as are implied by a reference genome and a list of SNPs and indels.
 
 \section{Methods}
 
 \subsection{Model}
 
-Formally, our model is a graph $G = ( N, E )$ comprised of a set of nodes $N = n_1, \ldots ,n_M$ and a set of directed edges $E = e_1 \ldots e_L$ such that $|N| = M$ and $|E| = L$. Each node $n_i$ represents a sequence $seq(n_i)$ which is built from an arbitrary alphabet $l$.
+Formally, our model is a graph $G = ( N, E )$ comprised of a set of nodes $N = n_1 \ldots n_M$ and a set of directed edges $E = e_1 \ldots e_L$ such that $|N| = M$ and $|E| = L$. Each node $n_i$ represents a sequence $seq(n_i)$ which is built from an arbitrary alphabet $l$.
 For DNA sequences, we might use $l = \{ A, T, G, C, N \}$, but in principle the model can be based in any alphabet.
 Edges represent linkages between sequences that have been observed in a reference set of samples or other sequences. We identify edges by the pairs of node ids that they conect: $e_{i \rightarrow j} = \{ i, j \}$.
 An edge $e_{i \rightarrow j}$ from $i$ to $j$ indicates that we have observed some sequence $n_i + n_j$.
@@ -109,19 +111,17 @@ A fragment of a larger variation graph derived from simulated genomes. Nodes are
 }
 \end{figure}
 
-\subsection{Format and library implementation}
+\subsection{Interchange format and library implementation}
 
 Experience with VCF \cite{danecek2011} and BAM \cite{li2009sambam} suggested that process of generating binary file formats is inimical to the productivity of scientific programmers.
 So to implement our variant graph format we used an increasingly-standard approach, and implemented the format as a schema which is then compiled into a software implementation by a specialized compiler. (In our case, we used protocol buffers \cite{protobuf}, but a number of similar methods exist.)
-We complied the schema into a C++ library which can be used to manipulate the basic entities in the graph (nodes and edges) and secondary descriptions of them, such as sequence alignments.
+We complied the schema (\url{https://github.com/ekg/vg/blob/master/vg.proto}) into a C++ library which can be used to manipulate the basic entities in the graph (nodes and edges) and secondary descriptions of them, such as sequence alignments.
 The resulting library defines a set of classes representing our graph whose in-memory and on-wire (or on-disk) representation is nearly identical.
 This allows us to efficiently store and retrieve fragments of the graph in a database, without incurring significantly more overhead than if the graph fragments were simple strings.
 
-We extend the basic classes produced by the protocol buffer compiler by wrapping them in a convenience class (VG) which defines a number of abstract operations on the graph. This graph object forms the core of a local alignment algorithm, a disk-based indexing system, and a mapper that employs both these modules to align reads against a large graph using $k-$mer matching and local partial-order alignment..
+We extend the basic classes produced by the protocol buffer compiler by wrapping them in a convenience class (VG) which defines a number of abstract operations on the graph. This graph object forms the core of a local alignment algorithm, a disk-based indexing system, and a mapper that employs both these modules to align reads against a large graph using $k$-mer matching and local partial-order alignment. These functions are exposed by the command-line utility \emph{vg} (\url{https://github.com/ekg/vg}), which provides the following interface:
 
-These functions are exposed by the command-line utility \emph{vg} (\url{https://github.com/ekg/vg}), which provides the following interface:
-
-\begin{description}
+\begin{description}  \itemsep1pt \parskip0pt \parsep0pt
   \item[ construct    ] graph construction
   \item[ view         ] conversion (protobuf/json/GFA)
   \item[ index        ] index features of the graph in a disk-backed key/value store
@@ -261,10 +261,10 @@ The algorithm is relatively straightforward, but we must take care to connect no
 
 \begin{algorithm}[h!]
   $I$ is our index \\
-  $k$ is our target $k-$mer size \\
+  $k$ is our target $k$-mer size \\
   \For{$n \in G$}{
     \For{$w \in $ kpaths($n$, $k$, $G$)}{
-      \For{$k \in $ $k-$mers of $w$}{
+      \For{$k \in $ $k$-mers of $w$}{
         $I[k] \gets $ ids of nodes in $w$
       }
     }
@@ -280,33 +280,109 @@ Generate $k-$paths of a graph
 
 A reference sequence is much-less useful if we can't quickly find subsequences matching a particular pattern in it. Here we describe the design of an indexing system that supports mapping reads into the variation graph.
 
-An ideal indexing strategy would allow the query of sequences of any length directly from the index, a property which is typified by suffix arrays \cite{puglisi2007taxonomy}. Compressed suffix arrays exploit redundancies in the indexed corpus to reduce their memory usage. In the context of linear sequences, the relationship between the compressible Burrows-Wheeler transform and the suffix array has been used to generate very memory-efficient alignment algorithms \cite{li2013aligning}. Extensions of this model extend the underlying sequence to be a directed acyclic graph, but existing implementations have only provided this at a high (~100X) cost in runtime \cite{siren2011indexing, huang2013short} relative to indexes based on linear sequences.
+An ideal indexing strategy would allow the query of sequences of any length directly from the index, a property which is typified by suffix arrays \cite{puglisi2007taxonomy}. Compressed suffix arrays exploit redundancies in the indexed corpus to reduce their memory usage. In the context of linear sequences, the relationship between the compressible Burrows-Wheeler transform and the suffix array has been used to generate very memory-efficient alignment algorithms \cite{li2013aligning}. Extensions of this model extend the underlying sequence to be a directed acyclic graph, but existing implementations have only provided this at a high (100X) cost in runtime \cite{siren2011indexing, huang2013short} relative to indexes based on linear sequences.
 
-A simple, if less memory-efficient approach is to index $k-$mers of a particular size corresponding to positions (or nodes) within the reference (or graph), as is done in popular query tools such as blat \cite{kent2002blat} and short-read aligners like Mosaik \cite{lee2014mosaik} and Novoalign (\url{http://novocraft.com}).
-Sequences can then be queried by breaking them into their components $k-$mers, looking these up, and clustering the results using the positional information provided in the index.
+A simple, if less memory-efficient approach is to index $k$-mers of a particular size corresponding to positions (or nodes) within the reference (or graph), as is done in popular query tools such as blat \cite{kent2002blat} and short-read aligners like Mosaik \cite{lee2014mosaik} and Novoalign (\url{http://novocraft.com}).
+Sequences can then be queried by breaking them into their components $k$-mers, looking these up, and clustering the results using the positional information provided in the index.
 ``Local'' alignment can then be used to refine the description of the mapping between the query and the reference.
 
 In our context, we have an additional problem. Whereas we can easily obtain subsequences from a linear reference, obtaining the sequence of a particular node from our graph requires us to load the entire system into memory. We could include a serialized index in our interchange format, but this would add complexity to a simple specification.
 
-To index the variant graph, first we implement a graph database using a disk-backed key value store. We use key namespacing to generate tables, and maintain interleaved tables for nodes and edges. Our values are serialized graph objects (nodes and edges). We can now add $k-$mer based keys to this graph, where the values are sets of nodes and positions in these nodes where the particular $k-$mers are found.
+To index the variant graph, first we implement a graph database using a disk-backed key value store. We use key namespacing to generate tables, and maintain interleaved tables for nodes and edges. Our values are serialized graph objects (nodes and edges). We can now add $k$-mer based keys to this graph, where the values are sets of nodes and positions in these nodes where the particular $k$-mers are found.
 
-Indexing is straightforward provided the set of all paths of the graph, which would contain the set of $k-$mers that we'd like to index over. Problematically, the set of all paths of the graph is very large, on the order of $|G|^{|G|}$. But, as we are only interested in paths of a given length, we can bound the problem by working from $k-$paths, which we define as paths that extend no more than $k$ letters beyond a given (arbitrary) node.
+Indexing is straightforward provided the set of all paths of the graph, which would contain the set of $k$-mers that we'd like to index over. Problematically, the set of all paths of the graph is very large, on the order of $|G|^{|G|}$. But, as we are only interested in paths of a given length, we can bound the problem by working from $k-$paths, which we define as paths that extend no more than $k$ letters beyond a given (arbitrary) node.
 
 We first define two recursive, depth-first searches to generate $k-$paths to the left (kpaths-) and right (kpaths+) of a given node. We then define a function which combines both of these to generate the $k-$paths for a given node (kpaths).
-Finally, we combine these in an algorithm \ref{alg:kpaths} that iterates over the nodes in our graph and $k-$mers in their $k-$paths.
+Finally, we combine these in an algorithm \ref{alg:kpaths} that iterates over the nodes in our graph and $k$-mers in their $k-$paths.
+
+
+\begin{algorithm}[h!]
+  $I \gets $ index of $G$ \\
+  $k \gets $ $k$-mer size \\
+  $q \gets $ query sequence \\
+  graph $g \gets ( \emptyset, \emptyset )$ \\
+  \For{$s \in kmers\_of(q, k)$}{
+    extend $g$ with the $kmer\_subgraph(s \in I)$
+  }
+  our max-subgraph size $z \gets $ 0 \\
+  \While{$z < |q|$}{
+    $g \gets g + neighbors\_of\_nodes(g)$ \\
+    $z \gets $ maximum length of a disjoint subgraph of $g$ \\
+  }
+  extend $g$ by joining its head nodes to a new, empty root node \\
+  align $q$ to $g$ using POA \\
+  \caption{
+    \label{alg:map}
+    Map a sequence $q$ to the graph
+  }
+\end{algorithm}
 
 
 \subsection{Alignment}
 
-We have implemented 
+Given a small graph, we can use partial order alignment (POA) \cite{lee2002POA} to generate an alignment between a novel sequence and our variation graph. To enable high-performance POA, we have followed the ``striped'' Smith-Waterman-Gotoh algorithm first described by \cite{farrar2007striped} as implemented in \cite{zhao2013ssw}, and adapted it to operate on partially-ordered sequence graphs to yield a parallel POA algorithm.
 
-% write algorithm
+As genome-scale graphs will be very large, we cannot apply this algorithm to obtain optimal alignments. A standard alignment approach is to subset the reference system to regions that are likely to be similar to our target. Provided the $k$-mer index produced in the previous section, we can establish such regions by looking for the $k$-mers of our query sequence (given by the function $kmers\_of$) in the index, then building up a set of candidate neighborhoods in the graph and aligning to them.
+
+Each $k$-mer $s$ corresponds to a subgraph $g$ of $G$ whose paths contain $s$. We call the function that returns this subgraph $kmer\_subgraph$. Each graph may contain several disjoint subgraphs $g_1\ldots g_x$, such that $g_i \cup g_j = \emptyset \forall i \ne j \in [0,x]$. If we query the index for the graph neighborhoods which contain paths matching our $s$, we can expect not to be able to align $s$ until one of the subgraphs has paths that are at least as large as $s$.
+
+We thus construct a simple read mapping algorithm \ref{alg:map} by obtaining a $k$-mer subgraph $g$ for $s$, and expanding its neighborhood incrementally by adding neighbor nodes until the maximum subgraph size is at least $|s|$. Once this criteria is met, we have a good chance of being able to obtain an full alignment of our sequence to the graph. Local alignment can be obtained by joining the subgraphs of $g$ to a single root node, and then aligning against this structure in one pass using POA. The resulting alignment describes an optimal path through a set of nodes as well as novel differences between the sequence and the aligned nodes in the variation graph. Provided the ids used for the nodes are maintained through alignment, the alignment can be contextualized into the full graph despite being defined against a dynamically-constructed subgraph.
+
 
 \section{Results}
 
-% table of genome
+\subsection{Tests of the command-line API}
+
+The command-line API provided by $vg$ is validated through a series of tests which can be run by executing ``make test'' in the project repository. These include evaluations of graph construction, conversion into other formats, local alignment, mapping (alignment using an index), index generation and querying (find), id manipulation, graph concatenation, and the generation of statistics describing variation graphs. See \url{https://github.com/ekg/vg/tree/master/test/t} for the corresponding examples.
+
+\subsection{Construction of a variation graph from 2500 individuals}
+
+We apply $vg$ to the construction of a reference graph for the \href{http://www.1000genomes.org/announcements/phase3-variant-calls-chry-are-available-variant-calls-chrx-have-been-updated-2014-11-0}{1000 Genomes Phase 3 release}, which includes more than 80 million sequence variants across 2500 individuals. This process took approximately 24 hours on a 48-core AMD Opteron system (@ 2.8GHz). Construction times varyied due to other use of the system during this process, but ran from approximately 100 CPU hours for larger chromosomes (1,2,3) to 10 CPU hours for smaller ones (20,21,22). For exposition, we used ``vg stats'' to generate statistics about the size of the variation graph for each chromosome \ref{tab:1000G}. The total on-disk size of the graphs is 11 gigabytes, which is 2.6 times the size of the un-annotated variants in the VCF file (position, reference, alternate = 1.3G) plus the reference (3.0G).
+% ? what is the amount of added sequence in the graph relative to the reference?
+% borked... doh
+
+\begin{table}[h!]
+\begin{tabular}{ r || r | r | r | r | r | r }
+chrom & nodes & edges & length & megabytes & bp/node & bp/edge \\
+\hline
+1 & 18807182 & 25672337 & 255749560 & 692.448 & 13.5985 & 9.96207 \\
+2 & 20596983 & 28111941 & 250307338 & 730.599 & 12.1526 & 8.90395 \\
+3 & 16964872 & 23148775 & 203879166 & 598.185 & 12.0177 & 8.80734 \\
+4 & 16662385 & 22748535 & 196908702 & 584.318 & 11.8176 & 8.65588 \\
+5 & 15312827 & 20898032 & 186201209 & 541.313 & 12.1598 & 8.90999 \\
+6 & 14596378 & 19934148 & 176166408 & 514.529 & 12.0692 & 8.83742 \\
+7 & 13707313 & 18722684 & 163876860 & 481.261 & 11.9554 & 8.75285 \\
+8 & 13370034 & 18268435 & 150983815 & 460.811 & 11.2927 & 8.26474 \\
+9 & 10355399 & 14140342 & 144791971 & 381.707 & 13.9823 & 10.2396 \\
+10 & 11595435 & 15848168 & 139550146 & 406.938 & 12.0349 & 8.80544 \\
+11 & 11760220 & 16063146 & 139073676 & 410.37 & 11.8258 & 8.65794 \\
+12 & 11239089 & 15348804 & 137742373 & 396.459 & 12.2557 & 8.97414 \\
+13 & 8304286 & 11334524 & 118039004 & 306.398 & 14.2142 & 10.4141 \\
+14 & 7714325 & 10536695 & 110018123 & 284.534 & 14.2615 & 10.4414 \\
+15 & 7045525 & 9623586 & 104966483 & 263.49 & 14.8983 & 10.9072 \\
+16 & 7837318 & 10727847 & 93071991 & 271.556 & 11.8755 & 8.67574 \\
+17 & 6757656 & 9242823 & 83542990 & 236.209 & 12.3627 & 9.03869 \\
+18 & 6592027 & 8999627 & 80356045 & 228.961 & 12.1899 & 8.92882 \\
+19 & 5305871 & 7273405 & 60979705 & 179.594 & 11.4929 & 8.38393 \\
+20 & 5267910 & 7198915 & 64852993 & 182.151 & 12.311 & 9.00872 \\
+21 & 3207033 & 4386537 & 49243049 & 117.292 & 15.3547 & 11.226 \\
+22 & 3197025 & 4381733 & 52422299 & 120.171 & 16.3972 & 11.9638 \\
+X & 10022133 & 13697203 & 158750551 & 387.294 & 15.84 & 11.59 \\
+\end{tabular}
+
+\caption{
+Variation graphs generated from the 1000 Genomes final release, along with the number of basepairs per node and edge, to demonstrate average density of variation. The lengths of the chromosomes correspond to the total sequence in all samples in the project.
+}
+\label{tab:1000G}
+
+\end{table}
 
 \section{Discussion}
+
+Here we have described a foundational system for the manipulation of a pan-genomic representation which we term a \emph{variation graph}. This system provides basic features that would be required if we were to engage in resequencing directly against this structure. We develop a binary interchange format for variation graphs and alignments against them. This format has a parallel representation in an on-disk index that allows fast querying of particular nodes and graph neighborhoods. We develop a method to index the $k$-mers of the variation graph and then align new sequences into the graph using this index to generate seeds.
+
+Unfortunately, the available time for this work was limited, and we have not been able to explore several aspects of this problem, such as alignment against large graphs and genotyping or copy-number determination. The specific form which this process might follow is unclear. One can imagine that the process of ``variant calling'' might be replaced in this context by a graph pruning operation, in which candidate (sometimes novel) nodes in a graph describing all the sequencing result for a particular sample are removed where there is insufficient or inconsistent information. Other problems, such as how to communicate results derived entirely within this format to researchers who are accustomed to using a linear map of the genome, remain outside the immediate scope of this work.
+
 
 %\pagebreak
 
