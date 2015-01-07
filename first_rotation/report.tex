@@ -201,15 +201,74 @@ The algorithm is relatively straightforward, but we must take care to connect no
 
 \begin{figure}[h!]
 \centering
-\includegraphics[width=0.6\textwidth]{figures/complexjunction}
+\includegraphics[width=0.5\textwidth]{figures/complexjunction}
 \caption{\label{fig:complexjunction}
-hello
+  An illustration of a complex portion of a variation graph. This represents a C/G SNP, followed immediately by a reference-relative insertion of a G, then an A/G SNP.
 }
 \end{figure}
 
 \subsection{Indexing}
 
-% write algorithm
+A reference sequence is much-less useful if we can't quickly find subsequences matching a particular pattern in it. Here we describe the design of an indexing system that supports mapping reads into the variation graph.
+
+An ideal indexing strategy would allow the query of sequences of any length directly from the index, a property which is typified by suffix arrays \cite{puglisi2007taxonomy}. Compressed suffix arrays exploit redundancies in the indexed corpus to reduce their memory usage. In the context of linear sequences, the relationship between the compressible Burrows-Wheeler transform and the suffix array has been used to generate very memory-efficient alignment algorithms \cite{li2013aligning}. Extensions of this model extend the underlying sequence to be a directed acyclic graph, but existing implementations have only provided this at a high (~100X) cost in runtime \cite{siren2011indexing, huang2013short} relative to indexes based on linear sequences.
+
+A simple, if less memory-efficient approach is to index k-mers of a particular size corresponding to positions (or nodes) within the reference (or graph), as is done in popular query tools such as blat \cite{kent2002blat} and short-read aligners like Mosaik \cite{lee2014mosaik} and Novoalign (\url{http://novocraft.com}).
+Sequences can then be queried by breaking them into their components k-mers, looking these up, and clustering the results using the positional information provided in the index.
+``Local'' alignment can then be used to refine the description of the mapping between the query and the reference.
+
+In our context, we have an additional problem. Whereas we can easily obtain subsequences from a linear reference, obtaining the sequence of a particular node from our graph requires us to load the entire system into memory. We could include a serialized index in our interchange format, but this would add complexity to a simple specification.
+
+To index the variant graph, first we implement a graph database using a disk-backed key value store. We use key namespacing to generate tables, and maintain interleaved tables for nodes and edges. Our values are serialized graph objects (nodes and edges). We can now add k-mer based keys to this graph, where the values are sets of nodes and positions in these nodes where the particular k-mers are found.
+
+Indexing is straightforward provided the set of all paths of the graph, which would contain the set of k-mers that we'd like to index over. Problematically, the set of all paths of the graph is very large, on the order of $|G|^{|G|}$. But, as we are only interested in paths of a given length, we can bound the problem by working from $k-$paths, which we define as paths that extend no more than $k$ letters beyond a given (arbitrary) node.
+
+We first define two recursive, depth-first searches to generate $k-$paths to the left (-) and right (+) of a given node:
+
+\begin{function}[h!]
+  \label{func:kpaths+}
+  $children \gets \forall n' : \exists e_{n' \rightarrow n} \in G$ \\
+  \eIf{$children = \emptyset$}{
+    add $p$ to $w$
+  }{
+    \For{$c$ in $children$}{
+      \eIf{$|seq(c)| < k$}{
+        kpaths+($c$, $p$, $w$, $k-|seq(c)|$, $G$)
+      }{
+        $p' \gets p + c$ \\
+        $w \gets w + p'$
+      }
+    }
+  }
+  \caption{kpaths+($n$, $p$, $w$, $k$, $G$) generates paths $w$ prefixed by $p$ that extend \emph{right} no more than $k$ from node $n$ }
+\end{function}
+
+\begin{function}[h!]
+  \label{func:kpaths-}
+  $parents \gets \forall n' : \exists e_{n \rightarrow n'} \in G$ \\
+  \eIf{$parents = \emptyset$}{
+    add $s$ to $w$
+  }{
+    \For{$p$ in $parents$}{
+      \eIf{$|seq(p)| < k$}{
+        kpaths-($p$, $p$, $w$, $k-|seq(p)|$, $G$)
+      }{
+        $s' \gets p + s$ \\
+        $w \gets w + s'$
+      }
+    }
+  }
+  \caption{kpaths-($n$, $s$, $w$, $k$, $G$) generates paths $w$ suffixed by $s$ that extend \emph{left} no more than $k$ from node $n$ }
+\end{function}
+
+In algorithm \ref{alg:kpaths} we iterate across the nodes in the graph to generate all $k-$paths, and store these in the k-mer table of our database.
+
+\begin{algorithm}[h!]
+  
+  \caption{
+\label{alg:kpaths}
+Graph construction from a list of variants and a reference}
+\end{algorithm}
 
 \subsection{Alignment}
 
@@ -220,6 +279,8 @@ hello
 % table of genome
 
 \section{Discussion}
+
+\pagebreak
 
 \bibliography{references}{}
 
